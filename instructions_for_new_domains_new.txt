@@ -1,0 +1,47 @@
+Instructions for setting up new CSO domain (operational model)
+
+1. Grab an existing folder and make a duplicate copy, changing name of
+top directory to reflect the new domain.
+
+2. Replace the topo / vege files in the topo_vege directory. These files (and others referred to below) are stored at: https://github.com/communitysnowobs/op_snowmodel_domains
+
+3. Delete the .dat files in the met folder. They will be recreated when the model runs
+
+4. Replace the grid_lat and grid_lon files in the extra directory
+
+5. Replace the snowmodel.inc file in the code directory. Essentially the only thing that changes in this file from domain to domain is the nx_max and the ny_max
+
+6. Get your hands on the 'best calibrated' .par file. This, right now, comes from Nina Aragon. Open the snowmodel.par, and make some changes: 
+
+6a. Change path of the met file
+6b. Change paths of NLCD and DEM files
+6c. Adjust output variables as needed (need to write out both Hs and SWE for google earth engine app, for example...)
+6d. Adjust paths to grid_lon / grid_lat
+
+7. Go to the op_snowmodel_python_scripts directory and copy over one of the met_data files, and name it accordingly, reflecting the new domain. Go the user inputs section
+
+7a. Change the paths
+7b. Change the domain name. It MUST match one the names here: https://raw.githubusercontent.com/snowmodel-tools/preprocess_python/master/CSO_domains.json
+
+8. You may wish to 'temporarily' change the flag to manual. I find it useful to do a short 'test' run (3-4 days) to ensure that everything works. This MUST be changed back to auto for the operational runs.
+
+9. To test out the met file, try this: (at the command line). You have to change the name of .py file to the new domain
+#run the query for met data
+cd /nfs/depot/cce_u1/hill/dfh/op_snowmodel/op_snowmodel_python_scripts
+source /nfs/attic/dfh/miniconda/bin/activate ee
+ipython met_data_ca.py
+conda deactivate
+
+10. Next, we want to check and make sure that the fortran code (snowmodel) works as expected. To do this, first manually adjust the par file (see step 6 above). If you ran the met query just for a few days, you need to set the maximum iterations in the par file by hand. And, this is a good time to go back to step 8, and change the flag back to auto.
+
+10a. Navigate to code folder and run compile_snowmodel.script. This will compile the code.
+10b. Do this, at the command line (be sure to have the correct path for new domain)
+#kick of snow model run for the domain
+cd /nfs/depot/cce_u1/hill/dfh/op_snowmodel/co_n_snowmodel/
+./snowmodel
+
+11. At this point, you need to run bits and pieces of the bash script...the reason for this has to do with figuring a slight offset issue...So, run through the pieces until you get to the section having to do with the conversion to geotiff. At this point, we need to figure out the projection (see the githubusercontent .json file...). Next, we need to figure out the ULLR values. To do this:
+
+11a. Use ncdump -c on one of the output .nc files. This will give you min / max values for x and y. Note that these are grid cell center values. For example, for the CO_N domain, I find x ranges from 278200 to 465300 and y ranges from 4246900 to 4452400. And, note that the grid cell size here is 100 m. So, for gdal_translate, we need to the UL and LR corner values, NOT grid cell centers. So we would issue:
+
+gdal_translate -of GTiff -a_srs EPSG:32613 -a_ullr 278150 4452450 465350 4246850 $fin $fout
